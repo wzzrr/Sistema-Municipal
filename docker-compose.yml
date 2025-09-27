@@ -1,0 +1,60 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: sv_db
+    environment:
+      POSTGRES_DB: svdb
+      POSTGRES_USER: sv
+      POSTGRES_PASSWORD: svpass
+    volumes:
+      - sv_pgdata:/var/lib/postgresql/data
+      - ./backend/sql:/docker-entrypoint-initdb.d
+      - uploads_data:/data/uploads
+    ports:
+      - "5432:5432"
+
+  api:
+    container_name: sv_api
+    build: ./backend
+    command: sh -lc "chown -R node:node /data || true ; node dist/main.js"
+    environment:
+      NOTIF_DEBUG_GRID: "true"
+      NOTIF_PHOTO_X_MM: 102
+      NOTIF_PHOTO_Y_MM: 70
+      NOTIF_PHOTO_W_MM: 100
+      NOTIF_PHOTO_H_MM: 75
+      DATA_DIR: /data
+      TEMPLATE_DIR: /app/templates
+      SMTP_HOST: smtp.tu-proveedor.com
+      SMTP_PORT: 587
+      SMTP_SECURE: "false"
+      SMTP_USER: usuario
+      SMTP_PASS: contraseña
+      MAIL_FROM: "Municipalidad <no-reply@seguridadvial.local>"
+      DATABASE_URL: postgres://sv:svpass@db:5432/svdb
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      PWD_SALT: ${PWD_SALT:-sv}
+      NODE_ENV: production
+      PORT: 3000
+      UPLOAD_DIR: /data/uploads
+    depends_on:
+      - db
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads_data:/data/uploads
+      - ./backend/templates:/app/templates:ro
+      - sv_data:/data
+
+  web:
+    container_name: sv_web
+    build: ./frontend
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  sv_pgdata:
+  uploads_data:
+  sv_data:
