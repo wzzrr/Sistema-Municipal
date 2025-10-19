@@ -1,4 +1,9 @@
+version: "3.9"
+
 services:
+  # =====================
+  # 🗄️ Base de datos
+  # =====================
   db:
     image: postgres:15-alpine
     container_name: sv_db
@@ -12,49 +17,203 @@ services:
       - uploads_data:/data/uploads
     ports:
       - "5432:5432"
+    networks:
+      - sv_net
 
+  # =====================
+  # 📬 SMTP para pruebas
+  # =====================
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: sv_mailhog
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # UI
+    networks:
+      - sv_net
+
+    # =====================
+  # 🚦 API Ingreso (Nest principal)
+  # =====================
   api:
     container_name: sv_api
     build: ./backend
     command: sh -lc "chown -R node:node /data || true ; node dist/main.js"
+    stdin_open: true
+    tty: true
     environment:
+      # --- Core ---
+      INTERNAL_API_TOKEN: super-secret-32
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://sv:svpass@db:5432/svdb
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      PWD_SALT: ${PWD_SALT:-sv}
+      DATA_DIR: /data
+      UPLOAD_DIR: /data/uploads
+      TEMPLATE_DIR: /app/templates
+
+      # --- SMTP ---
+      SMTP_HOST: sv_mailhog
+      SMTP_PORT: 1025
+      SMTP_SECURE: "false"
+      SMTP_USER:
+      SMTP_PASS:
+      MAIL_FROM: "Municipalidad <no-reply@seguridadvial.local>"
+
+      # --- API interna ---
+      INTERNAL_API_BASE: http://sv_api:3000/api
+
+      # --- Debug PDF (notificaciones) ---
       NOTIF_DEBUG_GRID: "true"
       NOTIF_PHOTO_X_MM: 102
       NOTIF_PHOTO_Y_MM: 70
       NOTIF_PHOTO_W_MM: 100
       NOTIF_PHOTO_H_MM: 75
-      DATA_DIR: /data
-      TEMPLATE_DIR: /app/templates
-      SMTP_HOST: smtp.tu-proveedor.com
-      SMTP_PORT: 587
-      SMTP_SECURE: "false"
-      SMTP_USER: usuario
-      SMTP_PASS: contraseña
-      MAIL_FROM: "Municipalidad <no-reply@seguridadvial.local>"
-      DATABASE_URL: postgres://sv:svpass@db:5432/svdb
-      JWT_SECRET: ${JWT_SECRET:-change-me}
-      PWD_SALT: ${PWD_SALT:-sv}
-      NODE_ENV: production
-      PORT: 3000
-      UPLOAD_DIR: /data/uploads
+
+      # =====================================================
+      # 🧾 Actas Presenciales (Ticket PDA)
+      # =====================================================
+      PRES_TPL_PDF: /app/templates/acta-presencial-template.pdf
+
+      PRES_ACTA_X_MM: 20
+      PRES_ACTA_Y_MM: 15
+
+      PRES_FECHA_X_MM: 20
+      PRES_FECHA_Y_MM: 25
+      PRES_HORA_X_MM: 60
+      PRES_HORA_Y_MM: 25
+
+      PRES_DOM_X_MM: 20
+      PRES_DOM_Y_MM: 35
+
+      PRES_COND_NOM_X_MM: 20
+      PRES_COND_NOM_Y_MM: 50
+      PRES_COND_DNI_X_MM: 20
+      PRES_COND_DNI_Y_MM: 55
+      PRES_COND_DOM_X_MM: 20
+      PRES_COND_DOM_Y_MM: 60
+      PRES_COND_CP_X_MM: 20
+      PRES_COND_CP_Y_MM: 65
+      PRES_COND_DEPTO_X_MM: 20
+      PRES_COND_DEPTO_Y_MM: 70
+      PRES_COND_PROV_X_MM: 20
+      PRES_COND_PROV_Y_MM: 75
+      PRES_COND_LIC_X_MM: 20
+      PRES_COND_LIC_Y_MM: 80
+
+      PRES_VEH_TIPO_X_MM: 20
+      PRES_VEH_TIPO_Y_MM: 90
+      PRES_VEH_MARCA_X_MM: 20
+      PRES_VEH_MARCA_Y_MM: 95
+      PRES_VEH_MODELO_X_MM: 20
+      PRES_VEH_MODELO_Y_MM: 100
+
+      # 🎯 Observaciones y Cinemáticos
+      PRES_OBS_X_MM: 20
+      PRES_OBS_Y_MM: 140
+
+      PRES_CINE_MARCA_X_MM: 20
+      PRES_CINE_MARCA_Y_MM: 160
+      PRES_CINE_MODELO_X_MM: 20
+      PRES_CINE_MODELO_Y_MM: 165
+      PRES_CINE_SERIE_X_MM: 20
+      PRES_CINE_SERIE_Y_MM: 170
+      PRES_CINE_APROB_X_MM: 20
+      PRES_CINE_APROB_Y_MM: 175
+
+      PRES_DEBUG_GRID: "true"
+
     depends_on:
       - db
+      - mailhog
     ports:
       - "3000:3000"
     volumes:
       - uploads_data:/data/uploads
       - ./backend/templates:/app/templates:ro
       - sv_data:/data
+    networks:
+      - sv_net
 
+
+  # =====================
+  # 🔎 API ConsultasSV
+  # =====================
+  consultas_api:
+    container_name: consultas_api
+    build: ./ConsultasSV/backend
+    stdin_open: true
+    tty: true
+    environment:
+      INTERNAL_API_BASE: http://sv_api:3000/api
+      INTERNAL_API_TOKEN: super-secret-32
+      NODE_ENV: production
+      PORT: 3000
+
+      DATABASE_URL: postgres://sv:svpass@db:5432/svdb
+      PGHOST: db
+      PGPORT: 5432
+      PGUSER: sv
+      PGPASSWORD: svpass
+      PGDATABASE: svdb
+
+      DATA_DIR: /data
+      UPLOAD_DIR: /data/uploads
+
+      SMTP_HOST: sv_mailhog
+      SMTP_PORT: 1025
+      SMTP_SECURE: "false"
+      SMTP_USER:
+      SMTP_PASS:
+      MAIL_FROM: "Municipalidad <no-reply@seguridadvial.local>"
+
+      JWT_SECRET: change-me
+      PWD_SALT: sv
+
+    depends_on:
+      - db
+      - mailhog
+    restart: unless-stopped
+    volumes:
+      - uploads_data:/data/uploads
+      - sv_data:/data
+      # ⬇️ ANTES: ./_empty:/app/sql:ro
+      # ⬆️ Eso ocultaba los scripts y no migraba nada
+      - ./backend/sql:/app/sql:ro   # ✅ ahora sí verá 001_*.sql, 002_*.sql, etc.
+    networks:
+      - sv_net
+
+
+  # =====================
+  # 🌐 Web (Nginx)
+  # =====================
   web:
     container_name: sv_web
-    build: ./frontend
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     depends_on:
       - api
+      - consultas_api
     ports:
       - "8080:80"
+    volumes:
+      - type: bind
+        source: C:\Users\felip\Proyecto\seguridad-vial-docker-clean\ConsultasSV\frontend\dist
+        target: /usr/share/nginx/html/consultas
+        read_only: true
+    networks:
+      - sv_net
 
+# =====================
+# 📦 Volúmenes y red
+# =====================
 volumes:
   sv_pgdata:
   uploads_data:
   sv_data:
+
+networks:
+  sv_net:
+    driver: bridge

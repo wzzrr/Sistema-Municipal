@@ -1,0 +1,211 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Paletas (Light por defecto / Dark con .dark en <html>)
+   ========================================================================== */
+:root {
+  --bg:#f6f7fb;
+  --panel:#ffffff;
+  --panel-2:#f5f7fb;
+  --surface:var(--panel);
+  --surface-1:var(--panel);
+  --surface-2:var(--panel-2);
+  --text:#0b0c10;
+  --muted:#5b6573;
+  --muted-2:var(--muted);
+  --border:rgba(2,6,23,.12);
+  --border-color:var(--border);
+  --primary:#2563eb;
+  --primary-contrast:#eff6ff;
+  --success:#16a34a;
+  --warning:#f59e0b;
+  --danger:#dc2626;
+  --info:#0891b2;
+  --font-sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+  --radius:12px;
+  --shadow-1:0 1px 2px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.06);
+  --shadow-2:0 1px 2px rgba(0,0,0,.08),0 12px 36px rgba(0,0,0,.08);
+  --s-1:.25rem;--s-2:.5rem;--s-3:.75rem;--s-4:1rem;--s-5:1.25rem;--s-6:1.5rem;--s-8:2rem;
+}
+
+.dark:root {
+  --bg:#0b1220;
+  --panel:#111827;
+  --panel-2:#0f172a;
+  --surface:var(--panel);
+  --surface-1:var(--panel);
+  --surface-2:var(--panel-2);
+  --text:#ffffff;
+  --muted:#9ca3af;
+  --muted-2:var(--muted);
+  --border:rgba(255,255,255,.08);
+  --border-color:var(--border);
+  --primary:#40aaf8;
+  --primary-contrast:#0b1220;
+  --success:#22c55e;
+  --warning:#f59e0b;
+  --danger:#f25757;
+  --info:#58c4dd;
+  --font-sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+  --radius:12px;
+  --shadow-1:0 1px 2px rgba(0,0,0,.24),0 8px 24px rgba(0,0,0,.24);
+  --shadow-2:0 1px 2px rgba(0,0,0,.28),0 12px 36px rgba(0,0,0,.28);
+  --s-1:.25rem;--s-2:.5rem;--s-3:.75rem;--s-4:1rem;--s-5:1.25rem;--s-6:1.5rem;--s-8:2rem;
+}
+
+/* ==========================================================================
+   Reset/estructura básica
+   ========================================================================== */
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+html{color-scheme:light}
+html.dark{color-scheme:dark}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:var(--font-sans);line-height:1.45;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale
+}
+img,svg,video{max-width:100%;display:block}
+a{color:var(--primary);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ==========================================================================
+   Topbar + Sidebar + Layout (lo seguimos usando)
+   ========================================================================== */
+.topbar{
+  height:64px;display:flex;align-items:center;gap:12px;
+  padding:0 16px;background:var(--surface-2);
+  border-bottom:1px solid var(--border);backdrop-filter:saturate(1.05) blur(6px);
+  position:sticky;top:0;z-index:50;
+}
+.topbar__left{display:flex;align-items:center;gap:12px}
+.hamburger{
+  width:36px;height:36px;border-radius:12px;border:1px solid var(--border);
+  background:transparent;color:var(--text);display:grid;place-items:center;cursor:pointer;
+}
+.topbar__brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.3px}
+.topbar__badge{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:#001f33;background:var(--primary)}
+.topbar__right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.userbtn{
+  height:36px;padding:0 12px;border-radius:12px;border:1px solid var(--border);
+  background:transparent;color:var(--text);display:flex;align-items:center;gap:10px;cursor:pointer;
+}
+
+.dropdown{
+  position:absolute;right:12px;top:64px;z-index:10;width:220px;background:var(--surface);
+  border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow-2);
+}
+.dropdown__item{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 12px;cursor:pointer;color:var(--text);
+}
+.dropdown__item:hover{background:rgba(255,255,255,.04)}
+.icon{color:var(--primary)}
+
+.layout{display:flex;min-height:calc(100vh - 64px)}
+.sidebar{
+  width:240px;background:var(--surface-2);border-right:1px solid var(--border);padding:12px;
+}
+.side__title{font-size:12px;color:var(--muted);margin:8px 8px 12px;text-transform:uppercase}
+.side__link{
+  display:flex;align-items:center;gap:10px;height:40px;padding:0 10px;border-radius:10px;
+  color:var(--text);text-decoration:none;
+}
+.side__link:hover{background:rgba(0,0,0,.04)}
+.side__link.is-active{background:rgba(64,170,248,.14);outline:1px solid rgba(64,170,248,.25)}
+.content{flex:1;padding:20px}
+
+/* ==========================================================================
+   Cards + Formularios + Botones (compatibilidad con Tailwind @apply)
+   ========================================================================== */
+@layer components {
+  /* Card (mapeada a utilidades) */
+  .card         { @apply rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm; }
+  .card__header { @apply px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3; }
+  .card__title  { @apply m-0 text-[1.1rem] font-semibold tracking-tight; }
+  .card__content{ @apply p-6; }
+  .card__footer { @apply px-6 py-5 border-t border-slate-200 dark:border-slate-800 flex items-center gap-3 justify-end; }
+
+  /* Form wrappers */
+  .form   { @apply grid gap-4; }
+  .field  { @apply grid gap-1; }
+  label   { @apply text-xs font-medium text-slate-500 dark:text-slate-400; }
+  .help   { @apply text-xs text-slate-500; }
+  .error  { @apply text-sm text-rose-500; }
+
+  /* Campos */
+  .input, .select, .textarea {
+    @apply w-full px-3 py-2 rounded-2xl border border-slate-300 dark:border-slate-700
+           bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100
+           outline-none transition-[box-shadow,border-color,background-color] duration-150;
+  }
+  .input:focus, .select:focus, .textarea:focus {
+    @apply ring-2 ring-emerald-600 border-transparent;
+  }
+  .input[readonly], .input:disabled,
+  .select:disabled, .textarea:disabled {
+    @apply opacity-70 cursor-not-allowed;
+  }
+
+  /* Botones (wrappers legacy) */
+  .actions { @apply flex flex-wrap items-center gap-3; }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 h-10 px-4 rounded-2xl
+           border border-slate-300 dark:border-slate-700
+           bg-slate-100 dark:bg-slate-900
+           text-slate-800 dark:text-slate-100
+           font-medium tracking-tight
+           transition-[transform,filter,background-color,border-color] duration-150 select-none;
+  }
+  .btn:hover  { @apply brightness-105; }
+  .btn:active { transform: translateY(1px); }
+  .btn[disabled]{ @apply opacity-60 cursor-not-allowed; }
+
+  .btn--primary { @apply bg-emerald-600 text-white border-transparent hover:bg-emerald-700; }
+  .btn--ghost   { @apply bg-transparent border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900; }
+  .btn--danger  { @apply bg-rose-600 text-white border-transparent hover:bg-rose-700; }
+  .btn--success { @apply bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-transparent; }
+
+  /* Espaciado cómodo de acciones en formularios */
+  .form > .actions { @apply mt-6; } /* aire respecto al último input */
+}
+
+/* Más aire en móviles para las acciones del form */
+@media (max-width: 640px) {
+  @layer components {
+    .form > .actions { @apply mt-7; }
+  }
+}
+
+/* ==========================================================================
+   Accordion + Lista compacta (se usan aún en partes)
+   ========================================================================== */
+details.accordion{
+  border:1px solid var(--border-color);border-radius:12px;
+  background:var(--surface-2);margin-bottom:16px;overflow:hidden;
+}
+details.accordion>summary{
+  list-style:none;cursor:pointer;padding:12px 14px;font-weight:600;
+  display:flex;align-items:center;justify-content:space-between;
+}
+details.accordion>summary::-webkit-details-marker{display:none}
+details.accordion[open]>summary{border-bottom:1px solid var(--border-color)}
+.accordion__body{padding:12px}
+
+.list{display:grid;gap:8px}
+.list__item{
+  background:var(--surface-1);
+  border:1px solid var(--border-color);
+  border-radius:10px;padding:10px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.list__item small{color:var(--muted-2)}
+
+/* ==========================================================================
+   Impresión
+   ========================================================================== */
+@media print{
+  .topbar,.toast{display:none!important}
+  body{background:#fff;color:#000}
+  .card{border-color:#ccc;box-shadow:none}
+}

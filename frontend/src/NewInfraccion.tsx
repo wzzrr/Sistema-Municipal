@@ -12,15 +12,10 @@ function normalizeHemi(h: string | undefined): 'N'|'S'|'E'|'W'|undefined {
   return undefined;
 }
 
-/**
- * parseDMS: acepta formatos con ° ' " o espacios, coma/punto decimal,
- * hemisferio N/S/E/W/O o signo en grados.
- * Ej: 28°27'42.85"S | 28 27 42,85 S | -28 27 42.85
- */
 function parseDMS(input: string): { dec: number, g:number, m:number, s:number, hemi?: 'N'|'S'|'E'|'W' } | null {
   if (!input) return null;
   let str = input.trim()
-    .replace(/,/g, '.')     // coma → punto
+    .replace(/,/g, '.')
     .replace(/\s+/g, ' ')
     .toUpperCase();
 
@@ -47,6 +42,13 @@ function parseDMS(input: string): { dec: number, g:number, m:number, s:number, h
 }
 // =========================================================
 
+/** Formatea una fecha (ISO) al estilo "02 DE OCTUBRE DE 2025" (ES-AR) */
+function toFechaTextoUpper(iso?: string) {
+  const d = iso ? new Date(iso) : new Date();
+  const txt = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+  return txt.replace(/ de /g, ' DE ').toUpperCase();
+}
+
 export default function NewInfraccion({ onDone }: { onDone: () => void }) {
   const { api } = useAuth();
 
@@ -62,6 +64,12 @@ export default function NewInfraccion({ onDone }: { onDone: () => void }) {
 
   const [ubicacion_texto, setUbicacion] = useState('');
   const [fecha_labrado, setFecha]       = useState<string>('');
+
+  // NUEVO: arteria
+  const [arteria, setArteria] = useState<string>('');
+
+  // NUEVO: emision_texto
+  const [emision_texto, setEmisionTexto] = useState<string>('');
 
   // velocidad medida
   const [velocidad_medida, setVM] = useState<number>(0);
@@ -128,12 +136,14 @@ export default function NewInfraccion({ onDone }: { onDone: () => void }) {
       const j = await r.json();
       const ocr = j.ocr || {};
 
-      // valores que pueden venir en el extract
       setUbicacion(ocr.ubicacion_texto || '');
       if (ocr.fecha_labrado) setFecha(ocr.fecha_labrado);
       if (ocr.velocidad_medida !== undefined) setVM(Number(ocr.velocidad_medida));
       if (ocr.cam_serie) setCamSerie(ocr.cam_serie);
       if (!dominio && ocr.dominio) setDominio(ocr.dominio);
+
+      if (ocr.arteria) setArteria(ocr.arteria);
+      if (ocr.emision_texto) setEmisionTexto(ocr.emision_texto);
 
       setMsg('Datos pre-cargados (revisá y completá).');
     } catch (e:any) {
@@ -168,6 +178,19 @@ export default function NewInfraccion({ onDone }: { onDone: () => void }) {
   const onLatBlur = () => parseLat(latRaw);
   const onLngBlur = () => parseLng(lngRaw);
 
+  // ---------- helpers emision_texto ----------
+  const autocompletarEmisionConLabrado = () => {
+    if (fecha_labrado) {
+      setEmisionTexto(toFechaTextoUpper(fecha_labrado));
+    } else {
+      setEmisionTexto(toFechaTextoUpper()); // hoy
+    }
+  };
+
+  const autocompletarEmisionHoy = () => {
+    setEmisionTexto(toFechaTextoUpper());
+  };
+
   // ---------- guardar ----------
   const save = async () => {
     try {
@@ -191,6 +214,10 @@ export default function NewInfraccion({ onDone }: { onDone: () => void }) {
 
         // número de serie
         cam_serie: cam_serie || undefined,
+
+        // NUEVOS
+        arteria: arteria || undefined,
+        emision_texto: emision_texto || undefined,
       };
 
       const r = await api('/api/infracciones', {
@@ -203,7 +230,7 @@ export default function NewInfraccion({ onDone }: { onDone: () => void }) {
       const j = await r.json();
       setLastId(j.id);
       setLastActa(j.nro_acta);
-      setMsg(`Guardado OK. Acta: ${j.nro_acta || j.id}. Generá el PDF.`);
+      setMsg(`Guardado OK. Acta: ${j.nro_acta || j.id}.`);
     } catch (e:any) {
       setMsg(e.message || 'Error');
     } finally {
@@ -211,7 +238,7 @@ export default function NewInfraccion({ onDone }: { onDone: () => void }) {
     }
   };
 
-  // ---------- PDF ----------
+  // ---------- PDF (preview/descarga directa desde API) ----------
   const genPdfStream = async () => {
     if (!lastId) return;
     try {
@@ -239,134 +266,212 @@ export default function NewInfraccion({ onDone }: { onDone: () => void }) {
 
   // ---------- UI ----------
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, marginBottom: 12 }}>
-      <h3 style={{ marginTop: 0 }}>Nueva Infracción</h3>
-
-      <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}>
-        <div>
-          <label>Imagen</label>
-          <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
-          {imageFileId && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Foto subida: <code>{imageFileId}</code></div>}
-        </div>
-        <div>
-          <label>TXT (opcional)</label>
-          <input type="file" accept=".txt,.TXT" onChange={(e) => setTxtFile(e.target.files?.[0] || null)} />
-          {txtFileId && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>TXT subido: <code>{txtFileId}</code></div>}
-        </div>
+    <div className="card card--elevated mb-6">
+      <div className="card__header">
+        <h3 className="card__title">Nueva Infracción</h3>
       </div>
 
-      <button onClick={handleUpload} style={{ marginTop: 8 }}>
-        Subir y extraer (TXT)
-      </button>
+      <div className="card__content">
+        {/* Uploads */}
+        <div className="grid-2">
+          <div className="field">
+            <label>Imagen</label>
+            <input
+              className="input"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+            />
+            {imageFileId && (
+              <div className="help mt-2">
+                Foto subida: <code>{imageFileId}</code>
+              </div>
+            )}
+          </div>
 
-      <div style={{ display: 'grid', gap: 8, marginTop: 12, gridTemplateColumns: '1fr 1fr' }}>
-        <div>
-          <label>Dominio</label>
+          <div className="field">
+            <label>TXT (opcional)</label>
+            <input
+              className="input"
+              type="file"
+              accept=".txt,.TXT"
+              onChange={(e) => setTxtFile(e.target.files?.[0] || null)}
+            />
+            {txtFileId && (
+              <div className="help mt-2">
+                TXT subido: <code>{txtFileId}</code>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="actions mt-4">
+          <button className="btn btn--primary" onClick={handleUpload}>Subir y extraer (TXT)</button>
+        </div>
+
+        {/* Datos básicos */}
+        <div className="grid-2 mt-6">
+          <div className="field">
+            <label>Dominio</label>
+            <input
+              className="input"
+              value={dominio}
+              onChange={(e) => setDominio(e.target.value)}
+              onBlur={onDominioBlur}
+              placeholder="AC091PZ"
+            />
+          </div>
+
+          <div className="field">
+            <label>Fecha labrado</label>
+            <input
+              className="input"
+              type="datetime-local"
+              value={fecha_labrado ? fecha_labrado.substring(0, 16) : ''}
+              onChange={(e) => setFecha(new Date(e.target.value).toISOString())}
+            />
+          </div>
+
+          <div className="field">
+            <label>Ubicación</label>
+            <input className="input" value={ubicacion_texto} onChange={(e) => setUbicacion(e.target.value)} />
+          </div>
+
+          <div className="field">
+            <label>Arteria</label>
+            <input
+              className="input"
+              list="arterias"
+              value={arteria}
+              onChange={(e)=>setArteria(e.target.value)}
+              placeholder="AVENIDA / CALLE / RUTA / AUTOPISTA"
+            />
+            <datalist id="arterias">
+              <option value="AVENIDA" />
+              <option value="CALLE" />
+              <option value="RUTA" />
+              <option value="AUTOPISTA" />
+              <option value="BOULEVARD" />
+            </datalist>
+          </div>
+        </div>
+
+        {/* Emisión */}
+        <div className="field mt-6">
+          <label>Emisión (texto)</label>
           <input
-            value={dominio}
-            onChange={(e) => setDominio(e.target.value)}
-            onBlur={onDominioBlur}
-            style={{ width: '100%' }}
-            placeholder="AC091PZ"
+            className="input"
+            value={emision_texto}
+            onChange={(e) => setEmisionTexto(e.target.value)}
+            placeholder="CATAMARCA, 02 DE OCTUBRE DE 2025"
           />
+          <div className="actions mt-2">
+            <button type="button" className="btn" onClick={autocompletarEmisionConLabrado} title="Usar fecha de labrado (o hoy)">
+              Autocompletar
+            </button>
+            <button type="button" className="btn btn--ghost" onClick={autocompletarEmisionHoy} title="Usar hoy">
+              Hoy
+            </button>
+          </div>
+          <div className="help mt-2">
+            * Campo libre (texto). Usá los botones para generar rápidamente desde fecha de labrado u hoy.
+          </div>
         </div>
 
-        <div>
-          <label>Fecha labrado</label>
-          <input
-            type="datetime-local"
-            value={fecha_labrado ? fecha_labrado.substring(0, 16) : ''}
-            onChange={(e) => setFecha(new Date(e.target.value).toISOString())}
-            style={{ width: '100%' }}
-          />
+        {/* Velocidad / Cámara */}
+        <div className="grid-2 mt-6">
+          <div className="field">
+            <label>Velocidad medida</label>
+            <input
+              className="input"
+              type="number"
+              value={velocidad_medida}
+              onChange={(e) => setVM(Number(e.target.value))}
+            />
+          </div>
+
+          <div className="field">
+            <label>N° Serie cámara (TruCam II)</label>
+            <input
+              className="input"
+              value={cam_serie}
+              onChange={(e)=>setCamSerie(e.target.value)}
+              placeholder="TC009925"
+            />
+          </div>
         </div>
 
-        <div>
-          <label>Ubicación</label>
-          <input value={ubicacion_texto} onChange={(e) => setUbicacion(e.target.value)} style={{ width: '100%' }} />
+        {/* Vehículo */}
+        <div className="grid-3 mt-6">
+          <div className="field">
+            <label>Tipo de Vehículo</label>
+            <input className="input" value={tipo_vehiculo} onChange={(e)=>setTipoVehiculo(e.target.value)} placeholder="AUTOMÓVIL" />
+          </div>
+          <div className="field">
+            <label>Marca</label>
+            <input className="input" value={vehiculo_marca} onChange={(e)=>setMarca(e.target.value)} placeholder="Volkswagen" />
+          </div>
+          <div className="field">
+            <label>Modelo</label>
+            <input className="input" value={vehiculo_modelo} onChange={(e)=>setModelo(e.target.value)} placeholder="Gol" />
+          </div>
         </div>
 
-        <div>
-          <label>Velocidad medida</label>
-          <input
-            type="number"
-            value={velocidad_medida}
-            onChange={(e) => setVM(Number(e.target.value))}
-            style={{ width: '100%' }}
-          />
+        {/* Lat/Lng (DMS) */}
+        <div className="grid-2 mt-6">
+          <div className="field">
+            <label>Latitud (DMS)</label>
+            <input
+              className="input"
+              placeholder={`28°27'42.85"S`}
+              value={latRaw}
+              onChange={(e)=>setLatRaw(e.target.value)}
+              onBlur={onLatBlur}
+            />
+            {latDecPreview !== null && (
+              <div className="help mt-2">→ {latDecPreview.toFixed(6)}</div>
+            )}
+          </div>
+
+          <div className="field">
+            <label>Longitud (DMS)</label>
+            <input
+              className="input"
+              placeholder={`65°47'02.91"O`}
+              value={lngRaw}
+              onChange={(e)=>setLngRaw(e.target.value)}
+              onBlur={onLngBlur}
+            />
+            {lngDecPreview !== null && (
+              <div className="help mt-2">→ {lngDecPreview.toFixed(6)}</div>
+            )}
+          </div>
         </div>
 
-        <div>
-          <label>N° Serie cámara (TruCam II)</label>
-          <input
-            value={cam_serie}
-            onChange={(e)=>setCamSerie(e.target.value)}
-            placeholder="TC009925"
-            style={{ width:'100%' }}
-          />
-        </div>
+        {/* Titular */}
+        {titular && (
+          <div className="card mt-6">
+            <div className="card__content">
+              <b>Titular</b><br />
+              {titular.nombre} — DNI {titular.dni}<br />
+              {titular.domicilio}
+            </div>
+          </div>
+        )}
 
-        <div>
-          <label>Tipo de Vehículo</label>
-          <input value={tipo_vehiculo} onChange={(e)=>setTipoVehiculo(e.target.value)} style={{ width:'100%' }} placeholder="AUTOMÓVIL" />
-        </div>
-        <div>
-          <label>Marca</label>
-          <input value={vehiculo_marca} onChange={(e)=>setMarca(e.target.value)} style={{ width:'100%' }} placeholder="Volkswagen" />
-        </div>
-        <div>
-          <label>Modelo</label>
-          <input value={vehiculo_modelo} onChange={(e)=>setModelo(e.target.value)} style={{ width:'100%' }} placeholder="Gol" />
-        </div>
-
-        {/* Sólo Lat/Lng (DMS) — se eliminó el “Pegar línea completa” */}
-        <div>
-          <label>Latitud (DMS)</label>
-          <input
-            placeholder={`28°27'42.85"S`}
-            value={latRaw}
-            onChange={(e)=>setLatRaw(e.target.value)}
-            onBlur={onLatBlur}
-            style={{ width:'100%' }}
-          />
-          {latDecPreview !== null && (
-            <div style={{ fontSize:12, color:'#6b7280' }}>→ {latDecPreview.toFixed(6)}</div>
-          )}
-        </div>
-
-        <div>
-          <label>Longitud (DMS)</label>
-          <input
-            placeholder={`65°47'02.91"O`}
-            value={lngRaw}
-            onChange={(e)=>setLngRaw(e.target.value)}
-            onBlur={onLngBlur}
-            style={{ width:'100%' }}
-          />
-          {lngDecPreview !== null && (
-            <div style={{ fontSize:12, color:'#6b7280' }}>→ {lngDecPreview.toFixed(6)}</div>
-          )}
-        </div>
+        {/* Mensajes */}
+        {msg && <div className="text-muted mt-4">{msg}</div>}
       </div>
 
-      {titular && (
-        <div style={{ marginTop: 8, padding: 8, background: '#f9fafb', borderRadius: 8 }}>
-          <b>Titular</b><br />
-          {titular.nombre} — DNI {titular.dni}<br />
-          {titular.domicilio}
-        </div>
-      )}
-
-      {msg && <div style={{ marginTop: 8, color: '#6b7280' }}>{msg}</div>}
-
-      <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button onClick={save} disabled={loading}>Guardar</button>
+      <div className="card__footer">
+        <button className="btn btn--primary" onClick={save} disabled={loading}>Guardar</button>
         {lastId && (
-          <button onClick={genPdfStream} disabled={loading}>
+          <button className="btn btn--success" onClick={genPdfStream} disabled={loading}>
             Generar PDF {lastActa ? `(${lastActa})` : ''}
           </button>
         )}
-        <button onClick={onDone} disabled={loading}>Finalizar</button>
+        <div className="spacer" />
+        <button className="btn" onClick={onDone} disabled={loading}>Finalizar</button>
       </div>
     </div>
   );

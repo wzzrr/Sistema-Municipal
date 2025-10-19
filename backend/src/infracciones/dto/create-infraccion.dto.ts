@@ -17,5 +17,10 @@ export class CreateInfraccionDto {
   @IsString() @IsOptional() vehiculo_marca?: string;
   @IsString() @IsOptional() vehiculo_modelo?: string;
 
-  @IsString() @IsOptional() cam_serie?: string;  // ya lo venías manejando
+  @IsString() @IsOptional() cam_serie?: string; 
+  
+  @IsOptional() @IsString() emision_texto?: string;
+  @IsOptional() @IsString() arteria?: string;
+
+
 }
