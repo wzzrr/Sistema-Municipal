@@ -1,8 +1,8 @@
 // frontend/src/auth.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type Role = 'admin' | 'operador' | 'auditor';
-type User = { id: number; email: string; rol: Role } | null;
+type Role = 'dev' | 'admin' | 'agente';
+type User = { id: number; email: string; nombre?: string; rol: Role } | null;
 
 type AuthCtx = {
   user: User;

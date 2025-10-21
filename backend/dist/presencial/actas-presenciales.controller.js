@@ -10,12 +10,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Res, HttpStatus } from '@nestjs/common';
 import dayjs from 'dayjs';
 import { ActasPresencialesService } from './actas-presenciales.service.js';
 let ActasPresencialesController = class ActasPresencialesController {
     constructor(service) {
         this.service = service;
+    }
+    async create(payload) {
+        const result = await this.service.createPresencial(payload);
+        return result;
     }
     async generarTicket(payload) {
         const fecha = payload.fechaActa ? dayjs(payload.fechaActa).toDate() : new Date();
@@ -25,12 +29,28 @@ let ActasPresencialesController = class ActasPresencialesController {
         });
         return {
             ok: true,
-            message: 'Ticket generado correctamente',
+            message: 'Ticket PNG generado correctamente',
             file: result.filename,
-            path: result.pdf_path,
+            path: result.png_path,
         };
     }
+    async ticketById(id, res) {
+        const infId = Number(id);
+        if (!Number.isFinite(infId))
+            return res.status(HttpStatus.BAD_REQUEST).json({ error: 'id inválido' });
+        const { bytes, filename } = await this.service.buildTicketBytesFromInfraccion(infId);
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+        res.status(200).send(Buffer.from(bytes));
+    }
 };
+__decorate([
+    Post(),
+    __param(0, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], ActasPresencialesController.prototype, "create", null);
 __decorate([
     Post('ticket'),
     __param(0, Body()),
@@ -38,6 +58,14 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], ActasPresencialesController.prototype, "generarTicket", null);
+__decorate([
+    Get(':id/ticket'),
+    __param(0, Param('id')),
+    __param(1, Res()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], ActasPresencialesController.prototype, "ticketById", null);
 ActasPresencialesController = __decorate([
     Controller('presencial'),
     __metadata("design:paramtypes", [ActasPresencialesService])

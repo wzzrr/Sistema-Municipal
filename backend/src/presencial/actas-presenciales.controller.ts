@@ -18,7 +18,7 @@ export class ActasPresencialesController {
   }
 
   /** POST /api/presencial/ticket
-   *  Existe actualmente: genera ticket desde payload (mantener).
+   *  Genera ticket PNG desde payload y lo guarda en disco.
    */
   @Post('ticket')
   async generarTicket(@Body() payload: any) {
@@ -29,14 +29,14 @@ export class ActasPresencialesController {
     });
     return {
       ok: true,
-      message: 'Ticket generado correctamente',
+      message: 'Ticket PNG generado correctamente',
       file: result.filename,
-      path: result.pdf_path,
+      path: result.png_path,
     };
   }
 
   /** GET /api/presencial/:id/ticket
-   *  Genera/stream del ticket a partir de la infraccion guardada (responde application/pdf)
+   *  Genera/stream del ticket PNG a partir de la infraccion guardada (responde image/png)
    */
   @Get(':id/ticket')
   async ticketById(@Param('id') id: string, @Res() res: Response) {
@@ -44,7 +44,7 @@ export class ActasPresencialesController {
     if (!Number.isFinite(infId)) return res.status(HttpStatus.BAD_REQUEST).json({ error: 'id inválido' });
 
     const { bytes, filename } = await this.service.buildTicketBytesFromInfraccion(infId);
-    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Type', 'image/png');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     res.status(200).send(Buffer.from(bytes));
   }

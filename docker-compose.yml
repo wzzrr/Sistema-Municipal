@@ -72,56 +72,97 @@ services:
       NOTIF_PHOTO_H_MM: 75
 
       # =====================================================
-      # 🧾 Actas Presenciales (Ticket PDA)
+      # 🧾 Actas Presenciales (Ticket PNG - Zebra ZQ520)
       # =====================================================
-      PRES_TPL_PDF: /app/templates/acta-presencial-template.pdf
+      # Template PNG: 832×1949px, 203ppi, grayscale
+      PRES_TPL_PNG: /app/templates/acta-presencial-template.png
+      PRES_PNG_DIR: /data/pngs-presenciales
 
-      PRES_ACTA_X_MM: 20
-      PRES_ACTA_Y_MM: 15
+      # Coordenadas en milímetros (convertidas a pixels: 1mm = 8px @ 203dpi)
+      PRES_ACTA_X_MM: 50
+      PRES_ACTA_Y_MM: 35 
 
       PRES_FECHA_X_MM: 20
-      PRES_FECHA_Y_MM: 25
-      PRES_HORA_X_MM: 60
-      PRES_HORA_Y_MM: 25
+      PRES_FECHA_Y_MM: 35 
+      # PRES_HORA_X_MM: 60 
+      # PRES_HORA_Y_MM: 25 
 
-      PRES_DOM_X_MM: 20
-      PRES_DOM_Y_MM: 35
+      PRES_DOMINIO_X_MM: 20 
+      PRES_DOMINIO_Y_MM: 65
 
-      PRES_COND_NOM_X_MM: 20
-      PRES_COND_NOM_Y_MM: 50
-      PRES_COND_DNI_X_MM: 20
-      PRES_COND_DNI_Y_MM: 55
-      PRES_COND_DOM_X_MM: 20
-      PRES_COND_DOM_Y_MM: 60
-      PRES_COND_CP_X_MM: 20
-      PRES_COND_CP_Y_MM: 65
-      PRES_COND_DEPTO_X_MM: 20
-      PRES_COND_DEPTO_Y_MM: 70
-      PRES_COND_PROV_X_MM: 20
-      PRES_COND_PROV_Y_MM: 75
-      PRES_COND_LIC_X_MM: 20
-      PRES_COND_LIC_Y_MM: 80
+      PRES_CONDUCTOR_NOMBRE_X_MM: 20
+      PRES_CONDUCTOR_NOMBRE_Y_MM: 43
+      PRES_CONDUCTOR_DNI_X_MM: 60
+      PRES_CONDUCTOR_DNI_Y_MM: 43
+      PRES_CONDUCTOR_DOM_X_MM: 60
+      PRES_CONDUCTOR_DOM_Y_MM: 50
 
-      PRES_VEH_TIPO_X_MM: 20
-      PRES_VEH_TIPO_Y_MM: 90
+      # Licencia conductor: número y clase SEPARADOS
+      PRES_CONDUCTOR_LIC_NRO_X_MM: 20
+      PRES_CONDUCTOR_LIC_NRO_Y_MM: 50
+      PRES_CONDUCTOR_LIC_CLASE_X_MM: 65
+      PRES_CONDUCTOR_LIC_CLASE_Y_MM: 56
+
+      # Ubicación del conductor (manual, puede diferir del titular)
+      PRES_CONDUCTOR_CP_X_MM: 20
+      PRES_CONDUCTOR_CP_Y_MM: 10
+      PRES_CONDUCTOR_DEPTO_X_MM: 20
+      PRES_CONDUCTOR_DEPTO_Y_MM: 56
+      PRES_CONDUCTOR_PROV_X_MM: 36
+      PRES_CONDUCTOR_PROV_Y_MM: 56
+
+      # Titular (datos del propietario del vehículo desde padrón)
+      PRES_TITULAR_NOMBRE_X_MM: 20
+      PRES_TITULAR_NOMBRE_Y_MM: 71
+      PRES_TITULAR_DNI_X_MM: 60
+      PRES_TITULAR_DNI_Y_MM: 65
+      PRES_TITULAR_DOMICILIO_X_MM: 60
+      PRES_TITULAR_DOMICILIO_Y_MM: 71
+      PRES_TITULAR_CP_X_MM: 88
+      PRES_TITULAR_CP_Y_MM: 76
+      PRES_TITULAR_DEPTO_X_MM: 20
+      PRES_TITULAR_DEPTO_Y_MM: 76
+      PRES_TITULAR_PROV_X_MM: 50
+      PRES_TITULAR_PROV_Y_MM: 76
+
+      PRES_VEH_TIPO_X_MM: 85
+      PRES_VEH_TIPO_Y_MM: 80
       PRES_VEH_MARCA_X_MM: 20
-      PRES_VEH_MARCA_Y_MM: 95
-      PRES_VEH_MODELO_X_MM: 20
-      PRES_VEH_MODELO_Y_MM: 100
+      PRES_VEH_MARCA_Y_MM: 80
+      PRES_VEH_MODELO_X_MM: 50
+      PRES_VEH_MODELO_Y_MM: 80
 
-      # 🎯 Observaciones y Cinemáticos
-      PRES_OBS_X_MM: 20
-      PRES_OBS_Y_MM: 140
+      # Tipo de infracción y lugar
+      # PRES_TIPO_INF_X_MM: 20
+      # PRES_TIPO_INF_Y_MM: 88
+      # PRES_LUGAR_X_MM: 20
+      # PRES_LUGAR_Y_MM: 93
 
+      # Velocidades
+      PRES_VEL_MEDIDA_X_MM: 20
+      PRES_VEL_MEDIDA_Y_MM: 93
+      # PRES_VEL_LIMITE_X_MM: 60
+      # PRES_VEL_LIMITE_Y_MM: 100
+
+      # 🎯 Datos cinemáticos (TruCam II)
       PRES_CINE_MARCA_X_MM: 20
-      PRES_CINE_MARCA_Y_MM: 160
-      PRES_CINE_MODELO_X_MM: 20
-      PRES_CINE_MODELO_Y_MM: 165
+      PRES_CINE_MARCA_Y_MM: 112
+      PRES_CINE_MODELO_X_MM: 60
+      PRES_CINE_MODELO_Y_MM: 112
       PRES_CINE_SERIE_X_MM: 20
-      PRES_CINE_SERIE_Y_MM: 170
-      PRES_CINE_APROB_X_MM: 20
-      PRES_CINE_APROB_Y_MM: 175
+      PRES_CINE_SERIE_Y_MM: 116
+      PRES_CINE_APROB_X_MM: 65
+      PRES_CINE_APROB_Y_MM: 116
 
+      # Remitido a
+      PRES_REMITIDO_A_X_MM: 85
+      PRES_REMITIDO_A_Y_MM: 35
+
+      # Observaciones
+      PRES_OBSERVACIONES_X_MM: 20
+      PRES_OBSERVACIONES_Y_MM: 125
+
+      # Debug: activar grilla de coordenadas en PNG
       PRES_DEBUG_GRID: "true"
 
     depends_on:

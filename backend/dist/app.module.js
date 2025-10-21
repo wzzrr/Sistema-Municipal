@@ -13,12 +13,14 @@ import { TitularesModule } from './titulares/titulares.module.js';
 import { NotificacionesModule } from './notificaciones/notificaciones.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ActasPresencialesModule } from './presencial/actas-presenciales.module.js';
+import { UsuariosModule } from './usuarios/usuarios.module.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
     Module({
         imports: [DatabaseModule, AuthModule, UploadsModule, InfraccionesModule,
-            TitularesModule, NotificacionesModule, HealthModule, ActasPresencialesModule],
+            TitularesModule, NotificacionesModule, HealthModule, ActasPresencialesModule, UsuariosModule, DashboardModule],
     })
 ], AppModule);
 export { AppModule };

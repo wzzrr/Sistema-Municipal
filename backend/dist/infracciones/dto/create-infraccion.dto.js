@@ -19,6 +19,11 @@ __decorate([
     __metadata("design:type", String)
 ], CreateInfraccionDto.prototype, "fecha_labrado", void 0);
 __decorate([
+    IsISO8601(),
+    IsOptional(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "fecha_notificacion", void 0);
+__decorate([
     IsNumber(),
     __metadata("design:type", Number)
 ], CreateInfraccionDto.prototype, "velocidad_medida", void 0);
@@ -71,3 +76,73 @@ __decorate([
     IsString(),
     __metadata("design:type", String)
 ], CreateInfraccionDto.prototype, "arteria", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "conductor_nombre", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "conductor_dni", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "conductor_domicilio", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "conductor_licencia", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "conductor_licencia_clase", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "conductor_cp", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "conductor_departamento", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "conductor_provincia", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "titular_nombre", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "titular_dni_cuit", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "titular_domicilio", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "titular_cp", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "titular_departamento", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    __metadata("design:type", String)
+], CreateInfraccionDto.prototype, "titular_provincia", void 0);

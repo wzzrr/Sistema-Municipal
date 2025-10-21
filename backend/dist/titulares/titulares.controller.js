@@ -25,7 +25,7 @@ let TitularesController = class TitularesController {
 };
 __decorate([
     Get(':dominio'),
-    Roles('operador', 'admin', 'auditor'),
+    Roles('dev', 'admin', 'agente'),
     __param(0, Param('dominio')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),

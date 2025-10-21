@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import dayjs from 'dayjs';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import sharp from 'sharp';
 
 const log = new Logger('ActasPresencialesService');
 
@@ -15,16 +15,88 @@ function numEnv(name: string, dflt: number): number {
 }
 
 const DATA_DIR = process.env.PRES_DATA_DIR || process.env.DATA_DIR || '/data';
-const PDF_DIR = process.env.PRES_PDF_DIR || path.join(DATA_DIR, 'pdfs-presenciales');
+const PNG_DIR = process.env.PRES_PNG_DIR || path.join(DATA_DIR, 'pngs-presenciales');
 const TPL_DIR = process.env.PRES_TPL_DIR || process.env.TEMPLATE_DIR || '/app/templates';
-const TPL_PDF = process.env.PRES_TPL_PDF || path.join(TPL_DIR, 'acta-presencial-template.pdf');
+const TPL_PNG = process.env.PRES_TPL_PNG || path.join(TPL_DIR, 'acta-presencial-template.png');
+
+// Especificaciones Zebra ZQ520 (basadas en template real)
+const IMG_WIDTH = 832;   // pixels
+const IMG_HEIGHT = 2172; // pixels (altura real del template)
+const IMG_DPI = 203;     // pixels por pulgada
+const MM_TO_PX = 8;      // 1mm = 8 pixels a 203 dpi
+
+// Variables de entorno para coordenadas en mm (convertidas a pixels)
+const PRES_ACTA_X = numEnv('PRES_ACTA_X_MM', 20) * MM_TO_PX;
+const PRES_ACTA_Y = numEnv('PRES_ACTA_Y_MM', 15) * MM_TO_PX;
+const PRES_FECHA_X = numEnv('PRES_FECHA_X_MM', 20) * MM_TO_PX;
+const PRES_FECHA_Y = numEnv('PRES_FECHA_Y_MM', 25) * MM_TO_PX;
+const PRES_HORA_X = numEnv('PRES_HORA_X_MM', 60) * MM_TO_PX;
+const PRES_HORA_Y = numEnv('PRES_HORA_Y_MM', 25) * MM_TO_PX;
+const PRES_DOMINIO_X = numEnv('PRES_DOMINIO_X_MM', 20) * MM_TO_PX;
+const PRES_DOMINIO_Y = numEnv('PRES_DOMINIO_Y_MM', 35) * MM_TO_PX;
+const PRES_CONDUCTOR_NOMBRE_X = numEnv('PRES_CONDUCTOR_NOMBRE_X_MM', 20) * MM_TO_PX;
+const PRES_CONDUCTOR_NOMBRE_Y = numEnv('PRES_CONDUCTOR_NOMBRE_Y_MM', 50) * MM_TO_PX;
+const PRES_CONDUCTOR_DNI_X = numEnv('PRES_CONDUCTOR_DNI_X_MM', 20) * MM_TO_PX;
+const PRES_CONDUCTOR_DNI_Y = numEnv('PRES_CONDUCTOR_DNI_Y_MM', 55) * MM_TO_PX;
+const PRES_CONDUCTOR_DOM_X = numEnv('PRES_CONDUCTOR_DOM_X_MM', 20) * MM_TO_PX;
+const PRES_CONDUCTOR_DOM_Y = numEnv('PRES_CONDUCTOR_DOM_Y_MM', 60) * MM_TO_PX;
+const PRES_CONDUCTOR_LIC_NRO_X = numEnv('PRES_CONDUCTOR_LIC_NRO_X_MM', 20) * MM_TO_PX;
+const PRES_CONDUCTOR_LIC_NRO_Y = numEnv('PRES_CONDUCTOR_LIC_NRO_Y_MM', 65) * MM_TO_PX;
+const PRES_CONDUCTOR_LIC_CLASE_X = numEnv('PRES_CONDUCTOR_LIC_CLASE_X_MM', 60) * MM_TO_PX;
+const PRES_CONDUCTOR_LIC_CLASE_Y = numEnv('PRES_CONDUCTOR_LIC_CLASE_Y_MM', 65) * MM_TO_PX;
+const PRES_CONDUCTOR_CP_X = numEnv('PRES_CONDUCTOR_CP_X_MM', 20) * MM_TO_PX;
+const PRES_CONDUCTOR_CP_Y = numEnv('PRES_CONDUCTOR_CP_Y_MM', 70) * MM_TO_PX;
+const PRES_CONDUCTOR_DEPTO_X = numEnv('PRES_CONDUCTOR_DEPTO_X_MM', 35) * MM_TO_PX;
+const PRES_CONDUCTOR_DEPTO_Y = numEnv('PRES_CONDUCTOR_DEPTO_Y_MM', 70) * MM_TO_PX;
+const PRES_CONDUCTOR_PROV_X = numEnv('PRES_CONDUCTOR_PROV_X_MM', 60) * MM_TO_PX;
+const PRES_CONDUCTOR_PROV_Y = numEnv('PRES_CONDUCTOR_PROV_Y_MM', 70) * MM_TO_PX;
+const PRES_TITULAR_NOMBRE_X = numEnv('PRES_TITULAR_NOMBRE_X_MM', 20) * MM_TO_PX;
+const PRES_TITULAR_NOMBRE_Y = numEnv('PRES_TITULAR_NOMBRE_Y_MM', 70) * MM_TO_PX;
+const PRES_TITULAR_DNI_X = numEnv('PRES_TITULAR_DNI_X_MM', 20) * MM_TO_PX;
+const PRES_TITULAR_DNI_Y = numEnv('PRES_TITULAR_DNI_Y_MM', 75) * MM_TO_PX;
+const PRES_TITULAR_DOMICILIO_X = numEnv('PRES_TITULAR_DOMICILIO_X_MM', 20) * MM_TO_PX;
+const PRES_TITULAR_DOMICILIO_Y = numEnv('PRES_TITULAR_DOMICILIO_Y_MM', 78) * MM_TO_PX;
+const PRES_TITULAR_CP_X = numEnv('PRES_TITULAR_CP_X_MM', 20) * MM_TO_PX;
+const PRES_TITULAR_CP_Y = numEnv('PRES_TITULAR_CP_Y_MM', 80) * MM_TO_PX;
+const PRES_TITULAR_DEPTO_X = numEnv('PRES_TITULAR_DEPTO_X_MM', 20) * MM_TO_PX;
+const PRES_TITULAR_DEPTO_Y = numEnv('PRES_TITULAR_DEPTO_Y_MM', 85) * MM_TO_PX;
+const PRES_TITULAR_PROV_X = numEnv('PRES_TITULAR_PROV_X_MM', 20) * MM_TO_PX;
+const PRES_TITULAR_PROV_Y = numEnv('PRES_TITULAR_PROV_Y_MM', 90) * MM_TO_PX;
+const PRES_VEH_TIPO_X = numEnv('PRES_VEH_TIPO_X_MM', 20) * MM_TO_PX;
+const PRES_VEH_TIPO_Y = numEnv('PRES_VEH_TIPO_Y_MM', 90) * MM_TO_PX;
+const PRES_VEH_MARCA_X = numEnv('PRES_VEH_MARCA_X_MM', 20) * MM_TO_PX;
+const PRES_VEH_MARCA_Y = numEnv('PRES_VEH_MARCA_Y_MM', 95) * MM_TO_PX;
+const PRES_VEH_MODELO_X = numEnv('PRES_VEH_MODELO_X_MM', 20) * MM_TO_PX;
+const PRES_VEH_MODELO_Y = numEnv('PRES_VEH_MODELO_Y_MM', 100) * MM_TO_PX;
+const PRES_TIPO_INF_X = numEnv('PRES_TIPO_INF_X_MM', 20) * MM_TO_PX;
+const PRES_TIPO_INF_Y = numEnv('PRES_TIPO_INF_Y_MM', 110) * MM_TO_PX;
+const PRES_LUGAR_X = numEnv('PRES_LUGAR_X_MM', 20) * MM_TO_PX;
+const PRES_LUGAR_Y = numEnv('PRES_LUGAR_Y_MM', 115) * MM_TO_PX;
+const PRES_VEL_MEDIDA_X = numEnv('PRES_VEL_MEDIDA_X_MM', 20) * MM_TO_PX;
+const PRES_VEL_MEDIDA_Y = numEnv('PRES_VEL_MEDIDA_Y_MM', 125) * MM_TO_PX;
+const PRES_VEL_LIMITE_X = numEnv('PRES_VEL_LIMITE_X_MM', 60) * MM_TO_PX;
+const PRES_VEL_LIMITE_Y = numEnv('PRES_VEL_LIMITE_Y_MM', 125) * MM_TO_PX;
+const PRES_CINE_MARCA_X = numEnv('PRES_CINE_MARCA_X_MM', 20) * MM_TO_PX;
+const PRES_CINE_MARCA_Y = numEnv('PRES_CINE_MARCA_Y_MM', 140) * MM_TO_PX;
+const PRES_CINE_MODELO_X = numEnv('PRES_CINE_MODELO_X_MM', 20) * MM_TO_PX;
+const PRES_CINE_MODELO_Y = numEnv('PRES_CINE_MODELO_Y_MM', 145) * MM_TO_PX;
+const PRES_CINE_SERIE_X = numEnv('PRES_CINE_SERIE_X_MM', 20) * MM_TO_PX;
+const PRES_CINE_SERIE_Y = numEnv('PRES_CINE_SERIE_Y_MM', 150) * MM_TO_PX;
+const PRES_CINE_APROB_X = numEnv('PRES_CINE_APROB_X_MM', 20) * MM_TO_PX;
+const PRES_CINE_APROB_Y = numEnv('PRES_CINE_APROB_Y_MM', 155) * MM_TO_PX;
+const PRES_REMITIDO_A_X = numEnv('PRES_REMITIDO_A_X_MM', 20) * MM_TO_PX;
+const PRES_REMITIDO_A_Y = numEnv('PRES_REMITIDO_A_Y_MM', 160) * MM_TO_PX;
+const PRES_OBSERVACIONES_X = numEnv('PRES_OBSERVACIONES_X_MM', 20) * MM_TO_PX;
+const PRES_OBSERVACIONES_Y = numEnv('PRES_OBSERVACIONES_Y_MM', 165) * MM_TO_PX;
+
+const DEBUG_GRID = process.env.PRES_DEBUG_GRID === 'true';
 
 @Injectable()
 export class ActasPresencialesService {
   constructor(@Inject('PG') private readonly db?: Pool) {}
 
   async ensureDirs() {
-    await fs.mkdir(PDF_DIR, { recursive: true }).catch(() => {});
+    await fs.mkdir(PNG_DIR, { recursive: true }).catch(() => {});
   }
 
   /** =========================================
@@ -37,7 +109,7 @@ export class ActasPresencialesService {
       await client.query('BEGIN');
 
       const serie = payload.serie || 'P';
-      const tipoInfraccion = 'Exceso de velocidad'; // 🔸 Valor fijo
+      const tipoInfraccion = payload.tipo_infraccion || 'Exceso de velocidad';
 
       // Generar correlativo
       const up = await client.query(
@@ -51,22 +123,26 @@ export class ActasPresencialesService {
         `INSERT INTO actas_presenciales (
           serie, nro_correlativo, dominio, tipo_infraccion, fecha_acta,
           conductor_nombre, conductor_dni, conductor_domicilio,
-          conductor_licencia, conductor_cp, conductor_departamento, conductor_provincia,
+          conductor_licencia, conductor_licencia_clase, conductor_cp, conductor_departamento, conductor_provincia,
           veh_tipo, veh_marca, veh_modelo,
           titular_nombre, titular_dni_cuit, titular_domicilio,
           titular_cp, titular_departamento, titular_provincia,
           cine_marca, cine_modelo, cine_serie, cine_aprobacion,
-          observaciones, estado, notificado, fecha_notificacion
+          velocidad_medida, velocidad_limite,
+          observaciones, lugar_infraccion, remitido_a,
+          estado, notificado, fecha_notificacion
         )
         VALUES (
           $1,$2,$3,$4,$5,
           $6,$7,$8,
-          $9,$10,$11,$12,
-          $13,$14,$15,
-          $16,$17,$18,
-          $19,$20,$21,
-          $22,$23,$24,$25,
-          $26,$27,$28,$29
+          $9,$10,$11,$12,$13,
+          $14,$15,$16,
+          $17,$18,$19,
+          $20,$21,$22,
+          $23,$24,$25,$26,
+          $27,$28,
+          $29,$30,$31,
+          $32,$33,$34
         )
         RETURNING id, serie, nro_correlativo`,
         [
@@ -76,11 +152,12 @@ export class ActasPresencialesService {
           tipoInfraccion,
           payload.fecha_acta || new Date(),
 
-          // Conductor
+          // Conductor (infractor)
           payload.infractor_nombre || null,
           payload.infractor_dni || null,
           payload.infractor_domicilio || null,
           payload.infractor_licencia || null,
+          payload.infractor_licencia_clase || null,
           payload.infractor_cp || null,
           payload.infractor_departamento || null,
           payload.infractor_provincia || null,
@@ -98,14 +175,22 @@ export class ActasPresencialesService {
           payload.titular_departamento || null,
           payload.titular_provincia || null,
 
-          // Cinemático
+          // Cinemático (TruCam II)
           payload.cineMarca || null,
           payload.cineModelo || null,
           payload.cineSerie || null,
           payload.cineAprobacion || null,
 
+          // Velocidad
+          payload.velocidad_medida || null,
+          payload.velocidad_limite || null,
+
           // Otros
           payload.observaciones || null,
+          payload.lugar_infraccion || null,
+          payload.remitido_a || null,
+
+          // Estado
           'notificada',
           true,
           payload.fecha_acta || new Date(),
@@ -136,16 +221,20 @@ export class ActasPresencialesService {
   }
 
   /** =========================================
-   *  GENERAR PDF DESDE REGISTRO DB
+   *  GENERAR PNG DESDE REGISTRO DB
    *  ========================================= */
   async buildTicketBytesFromInfraccion(id: number) {
     if (!this.db) throw new Error('DB pool no inyectado');
     const r = await this.db.query(
       `SELECT
-         i.id, i.serie, i.nro_correlativo, i.dominio, i.fecha_acta,
+         i.id, i.serie, i.nro_correlativo, i.dominio, i.fecha_acta, i.tipo_infraccion,
          i.veh_tipo, i.veh_marca, i.veh_modelo,
-         i.conductor_nombre, i.conductor_dni, i.conductor_domicilio,
-         t.nombre AS titular_nombre, t.dni AS titular_dni, t.domicilio AS titular_domicilio
+         i.conductor_nombre, i.conductor_dni, i.conductor_domicilio, i.conductor_licencia, i.conductor_licencia_clase,
+         i.conductor_cp, i.conductor_departamento, i.conductor_provincia,
+         i.cine_marca, i.cine_modelo, i.cine_serie, i.cine_aprobacion,
+         i.velocidad_medida, i.velocidad_limite, i.lugar_infraccion, i.remitido_a, i.observaciones,
+         t.nombre AS titular_nombre, t.dni AS titular_dni, t.domicilio AS titular_domicilio,
+         t.cp AS titular_cp, t.departamento AS titular_departamento, t.provincia AS titular_provincia
        FROM actas_presenciales i
        LEFT JOIN titulares t ON t.dominio = i.dominio
        WHERE i.id = $1`,
@@ -160,72 +249,162 @@ export class ActasPresencialesService {
       nroActa,
       fechaActa: row.fecha_acta || new Date(),
       dominio: row.dominio,
+      tipoInfraccion: row.tipo_infraccion,
       conductorNombre: row.conductor_nombre,
       conductorDni: row.conductor_dni,
       conductorDomicilio: row.conductor_domicilio,
+      conductorLicencia: row.conductor_licencia,
+      conductorLicenciaClase: row.conductor_licencia_clase,
+      conductorCp: row.conductor_cp,
+      conductorDepartamento: row.conductor_departamento,
+      conductorProvincia: row.conductor_provincia,
       vehTipo: row.veh_tipo,
       vehMarca: row.veh_marca,
       vehModelo: row.veh_modelo,
+      cineMarca: row.cine_marca,
+      cineModelo: row.cine_modelo,
+      cineSerie: row.cine_serie,
+      cineAprobacion: row.cine_aprobacion,
+      velocidadMedida: row.velocidad_medida,
+      velocidadLimite: row.velocidad_limite,
+      lugarInfraccion: row.lugar_infraccion,
+      remitidoA: row.remitido_a,
+      observaciones: row.observaciones,
       titularNombre: row.titular_nombre,
       titularDni: row.titular_dni,
       titularDomicilio: row.titular_domicilio,
+      titularCp: row.titular_cp,
+      titularDepartamento: row.titular_departamento,
+      titularProvincia: row.titular_provincia,
     };
 
     const bytes = await this.buildTicketBytes(payload);
-    const filename = `PRES-${nroActa}.pdf`;
+    const filename = `PRES-${nroActa}.png`;
     return { bytes, filename };
   }
 
   /** =========================================
-   *  GENERAR PDF (bytes)
+   *  GENERAR PNG (bytes) con Sharp
    *  ========================================= */
   async buildTicketBytes(payload: any) {
-    let tpl: Buffer | null = null;
+    // Cargar template PNG
+    let templateBuffer: Buffer;
     try {
-      tpl = await fs.readFile(TPL_PDF);
-    } catch {
-      log.warn(`Plantilla no encontrada en ${TPL_PDF}, generando hoja en blanco.`);
+      templateBuffer = await fs.readFile(TPL_PNG);
+      log.log(`Template cargado desde ${TPL_PNG}`);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      log.error(`Template PNG no encontrado en ${TPL_PNG}: ${errMsg}`);
+      throw new Error(`Template PNG no disponible: ${errMsg}`);
     }
 
-    const pdfDoc = tpl ? await PDFDocument.load(tpl) : await PDFDocument.create();
-    if (!tpl) pdfDoc.addPage([210, 297]);
-
-    const page = pdfDoc.getPage(0);
-    const { width, height } = page.getSize();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const color = rgb(0, 0, 0);
-    const mm = (n: number) => n * 2.8346;
-    const yTop = (mmFromTop: number) => height - mm(mmFromTop);
-    const draw = (txt: string, x: number, y: number, s = 9, b = false) =>
-      page.drawText(txt ?? '', { x: mm(x), y: yTop(y), size: s, font: b ? bold : font, color });
-
+    // Formatear datos
     const f = dayjs(payload.fechaActa).format('DD/MM/YYYY');
     const h = dayjs(payload.fechaActa).format('HH:mm');
 
-    draw(`${payload.nroActa}`, 20, 15, 10, true);
-    draw(f, 20, 25);
-    draw(h, 60, 25);
-    draw(payload.dominio || '', 20, 35, 10, true);
-    draw(payload.conductorNombre || '', 20, 50);
-    draw(payload.conductorDni ? `DNI: ${payload.conductorDni}` : '', 20, 55);
-    draw(payload.conductorDomicilio || '', 20, 60);
-    draw(payload.vehTipo || '', 20, 90);
-    draw(payload.vehMarca || '', 20, 95);
-    draw(payload.vehModelo || '', 20, 100);
+    // Crear textos SVG para overlay (solo valores, sin etiquetas - el template ya las tiene)
+    // NOTA: Campos comentados en docker-compose.yml NO se muestran en el PNG
+    const textElements = [
+      { text: payload.nroActa || '', x: PRES_ACTA_X, y: PRES_ACTA_Y, bold: true, size: 12 },
+      { text: f, x: PRES_FECHA_X, y: PRES_FECHA_Y, bold: true, size: 12 },
+      // HORA - comentado en docker-compose.yml, NO se muestra
+      { text: payload.dominio || '', x: PRES_DOMINIO_X, y: PRES_DOMINIO_Y, bold: true, size: 12 },
 
-    return pdfDoc.save();
+      // Infractor/Conductor (datos ingresados manualmente desde el formulario)
+      { text: payload.conductorNombre || '', x: PRES_CONDUCTOR_NOMBRE_X, y: PRES_CONDUCTOR_NOMBRE_Y, bold: true, size: 12 },
+      { text: payload.conductorDni || '', x: PRES_CONDUCTOR_DNI_X, y: PRES_CONDUCTOR_DNI_Y, bold: true, size: 12 },
+      { text: payload.conductorDomicilio || '', x: PRES_CONDUCTOR_DOM_X, y: PRES_CONDUCTOR_DOM_Y, bold: true, size: 12 },
+      // Licencia: número y clase en campos SEPARADOS
+      { text: payload.conductorLicencia || '', x: PRES_CONDUCTOR_LIC_NRO_X, y: PRES_CONDUCTOR_LIC_NRO_Y, bold: true, size: 12 },
+      { text: payload.conductorLicenciaClase || '', x: PRES_CONDUCTOR_LIC_CLASE_X, y: PRES_CONDUCTOR_LIC_CLASE_Y, bold: true, size: 12 },
+      // Ubicación del conductor (manual, puede diferir del titular) - CP oculto en PNG pero guardado en BD
+      { text: payload.conductorDepartamento || '', x: PRES_CONDUCTOR_DEPTO_X, y: PRES_CONDUCTOR_DEPTO_Y, bold: true, size: 12 },
+      { text: payload.conductorProvincia || '', x: PRES_CONDUCTOR_PROV_X, y: PRES_CONDUCTOR_PROV_Y, bold: true, size: 12 },
+
+      // Titular (datos del propietario del vehículo desde padrón)
+      { text: payload.titularNombre || '', x: PRES_TITULAR_NOMBRE_X, y: PRES_TITULAR_NOMBRE_Y, bold: true, size: 12 },
+      { text: payload.titularDni || '', x: PRES_TITULAR_DNI_X, y: PRES_TITULAR_DNI_Y, bold: true, size: 12 },
+      { text: payload.titularDomicilio || '', x: PRES_TITULAR_DOMICILIO_X, y: PRES_TITULAR_DOMICILIO_Y, bold: true, size: 12 },
+      { text: payload.titularCp || '', x: PRES_TITULAR_CP_X, y: PRES_TITULAR_CP_Y, bold: true, size: 12 },
+      { text: payload.titularDepartamento || '', x: PRES_TITULAR_DEPTO_X, y: PRES_TITULAR_DEPTO_Y, bold: true, size: 12 },
+      { text: payload.titularProvincia || '', x: PRES_TITULAR_PROV_X, y: PRES_TITULAR_PROV_Y, bold: true, size: 12 },
+
+      // Vehículo (valores puros)
+      { text: payload.vehTipo || '', x: PRES_VEH_TIPO_X, y: PRES_VEH_TIPO_Y, bold: true, size: 12 },
+      { text: payload.vehMarca || '', x: PRES_VEH_MARCA_X, y: PRES_VEH_MARCA_Y, bold: true, size: 12 },
+      { text: payload.vehModelo || '', x: PRES_VEH_MODELO_X, y: PRES_VEH_MODELO_Y, bold: true, size: 12 },
+
+      // TIPO_INF y LUGAR - comentados en docker-compose.yml, NO se muestran
+
+      // Velocidades (solo velocidad medida, límite está comentado)
+      { text: payload.velocidadMedida ? `${payload.velocidadMedida} km/h` : '', x: PRES_VEL_MEDIDA_X, y: PRES_VEL_MEDIDA_Y, bold: true, size: 12 },
+      // VELOCIDAD_LIMITE - comentado en docker-compose.yml, NO se muestra
+
+      // Cinemático TruCam II (valores puros)
+      { text: payload.cineMarca || '', x: PRES_CINE_MARCA_X, y: PRES_CINE_MARCA_Y, bold: true, size: 12 },
+      { text: payload.cineModelo || '', x: PRES_CINE_MODELO_X, y: PRES_CINE_MODELO_Y, bold: true, size: 12 },
+      { text: payload.cineSerie || '', x: PRES_CINE_SERIE_X, y: PRES_CINE_SERIE_Y, bold: true, size: 12 },
+      { text: payload.cineAprobacion || '', x: PRES_CINE_APROB_X, y: PRES_CINE_APROB_Y, bold: true, size: 12 },
+
+      // Remitido a
+      { text: payload.remitidoA || '', x: PRES_REMITIDO_A_X, y: PRES_REMITIDO_A_Y, bold: true, size: 12 },
+
+      // Observaciones
+      { text: payload.observaciones || '', x: PRES_OBSERVACIONES_X, y: PRES_OBSERVACIONES_Y, bold: true, size: 12 },
+    ];
+
+    // Generar SVG overlay con textos
+    const svgTexts = textElements
+      .filter(el => el.text)
+      .map(el => {
+        const weight = el.bold ? 'bold' : 'normal';
+        return `<text x="${el.x}" y="${el.y}" font-family="DejaVu Sans, sans-serif" font-size="${el.size}px" font-weight="${weight}" fill="black">${this.escapeXml(el.text)}</text>`;
+      })
+      .join('\n    ');
+
+    const svgOverlay = `
+<svg width="${IMG_WIDTH}" height="${IMG_HEIGHT}">
+  <rect width="${IMG_WIDTH}" height="${IMG_HEIGHT}" fill="none"/>
+  ${svgTexts}
+</svg>`;
+
+    // Componer imagen final con Sharp
+    const imageBuffer = await sharp(templateBuffer)
+      .composite([
+        {
+          input: Buffer.from(svgOverlay),
+          top: 0,
+          left: 0,
+        },
+      ])
+      .png({ compressionLevel: 9, palette: true }) // PNG optimizado para impresora
+      .withMetadata({ density: IMG_DPI })
+      .toBuffer();
+
+    log.log(`PNG generado: ${imageBuffer.length} bytes`);
+    return imageBuffer;
+  }
+
+  /** Escapar caracteres XML en textos */
+  private escapeXml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
   }
 
   /** =========================================
-   *  GUARDAR PDF EN DISCO
+   *  GUARDAR PNG EN DISCO
    *  ========================================= */
   async saveTicket(payload: any) {
     await this.ensureDirs();
     const bytes = await this.buildTicketBytes(payload);
-    const filename = `PRES-${payload.nroActa}.pdf`;
-    const outPath = path.join(PDF_DIR, filename);
+    const filename = `PRES-${payload.nroActa}.png`;
+    const outPath = path.join(PNG_DIR, filename);
     await fs.writeFile(outPath, bytes);
-    return { filename, pdf_path: outPath, bytes };
+    log.log(`PNG guardado en ${outPath} (${bytes.length} bytes)`);
+    return { filename, png_path: outPath, bytes };
   }
 }

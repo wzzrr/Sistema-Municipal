@@ -42,6 +42,9 @@ export class InfraccionesService {
 
   /** === Crear nueva infracción === */
   async create(dto: any) {
+    this.log.debug('=== CREATE INFRACCION - DTO RECEIVED ===');
+    this.log.debug(JSON.stringify(dto, null, 2));
+
     const client = await this.db.connect();
     try {
       await client.query('BEGIN');
@@ -55,21 +58,29 @@ export class InfraccionesService {
       // ✅ Inserta sin nro_correlativo → el trigger asigna automáticamente
       const ins = await client.query(
         `INSERT INTO infracciones(
-           serie, dominio, tipo_infraccion, fecha_labrado,
+           serie, dominio, tipo_infraccion, fecha_labrado, fecha_notificacion,
            velocidad_medida, velocidad_autorizada, ubicacion_texto, lat, lng,
            foto_file_id, cam_serie, tipo_vehiculo, vehiculo_marca, vehiculo_modelo,
-           emision_texto, arteria, estado
+           emision_texto, arteria, estado,
+           conductor_nombre, conductor_dni, conductor_domicilio, conductor_licencia,
+           conductor_licencia_clase, conductor_cp, conductor_departamento, conductor_provincia,
+           titular_nombre, titular_dni_cuit, titular_domicilio,
+           titular_cp, titular_departamento, titular_provincia
          )
          VALUES(
-           $1, $2, 'Exceso de velocidad', $3,
-           $4, $5, $6, $7, $8,
-           $9, $10, $11, $12, $13,
-           $14, $15, 'validada'
+           $1, $2, 'Exceso de velocidad', $3, $4,
+           $5, $6, $7, $8, $9,
+           $10, $11, $12, $13, $14,
+           $15, $16, 'validada',
+           $17, $18, $19, $20,
+           $21, $22, $23, $24,
+           $25, $26, $27,
+           $28, $29, $30
          )
          RETURNING id`,
         [
           serie,
-          dto.dominio, dto.fecha_labrado,
+          dto.dominio, dto.fecha_labrado, dto.fecha_notificacion || null,
           vMed, vAut,
           dto.ubicacion_texto || null,
           dto.lat ?? null, dto.lng ?? null,
@@ -80,6 +91,22 @@ export class InfraccionesService {
           dto.vehiculo_modelo || null,
           dto.emision_texto ?? null,
           dto.arteria ?? null,
+          // Conductor/Infractor
+          dto.conductor_nombre || null,
+          dto.conductor_dni || null,
+          dto.conductor_domicilio || null,
+          dto.conductor_licencia || null,
+          dto.conductor_licencia_clase || null,
+          dto.conductor_cp || null,
+          dto.conductor_departamento || null,
+          dto.conductor_provincia || null,
+          // Titular
+          dto.titular_nombre || null,
+          dto.titular_dni_cuit || null,
+          dto.titular_domicilio || null,
+          dto.titular_cp || null,
+          dto.titular_departamento || null,
+          dto.titular_provincia || null,
         ],
       );
 
@@ -159,12 +186,31 @@ export class InfraccionesService {
     if (dto.velocidad_medida     !== undefined) push('velocidad_medida=$X', Number(dto.velocidad_medida) || 0);
     if (dto.velocidad_autorizada !== undefined) push('velocidad_autorizada=$X', Number(dto.velocidad_autorizada) || 0);
     if (dto.estado               !== undefined) push('estado=$X', dto.estado);
+    if (dto.fecha_notificacion   !== undefined) push('fecha_notificacion=$X', dto.fecha_notificacion);
     if (dto.cam_serie            !== undefined) push('cam_serie=$X', dto.cam_serie);
     if (dto.tipo_vehiculo        !== undefined) push('tipo_vehiculo=$X', dto.tipo_vehiculo);
     if (dto.vehiculo_marca       !== undefined) push('vehiculo_marca=$X', dto.vehiculo_marca);
     if (dto.vehiculo_modelo      !== undefined) push('vehiculo_modelo=$X', dto.vehiculo_modelo);
     if (dto.arteria              !== undefined) push('arteria=$X', dto.arteria);
     if (dto.emision_texto        !== undefined) push('emision_texto=$X', dto.emision_texto);
+
+    // Conductor/Infractor
+    if (dto.conductor_nombre         !== undefined) push('conductor_nombre=$X', dto.conductor_nombre);
+    if (dto.conductor_dni            !== undefined) push('conductor_dni=$X', dto.conductor_dni);
+    if (dto.conductor_domicilio      !== undefined) push('conductor_domicilio=$X', dto.conductor_domicilio);
+    if (dto.conductor_licencia       !== undefined) push('conductor_licencia=$X', dto.conductor_licencia);
+    if (dto.conductor_licencia_clase !== undefined) push('conductor_licencia_clase=$X', dto.conductor_licencia_clase);
+    if (dto.conductor_cp             !== undefined) push('conductor_cp=$X', dto.conductor_cp);
+    if (dto.conductor_departamento   !== undefined) push('conductor_departamento=$X', dto.conductor_departamento);
+    if (dto.conductor_provincia      !== undefined) push('conductor_provincia=$X', dto.conductor_provincia);
+
+    // Titular
+    if (dto.titular_nombre       !== undefined) push('titular_nombre=$X', dto.titular_nombre);
+    if (dto.titular_dni_cuit     !== undefined) push('titular_dni_cuit=$X', dto.titular_dni_cuit);
+    if (dto.titular_domicilio    !== undefined) push('titular_domicilio=$X', dto.titular_domicilio);
+    if (dto.titular_cp           !== undefined) push('titular_cp=$X', dto.titular_cp);
+    if (dto.titular_departamento !== undefined) push('titular_departamento=$X', dto.titular_departamento);
+    if (dto.titular_provincia    !== undefined) push('titular_provincia=$X', dto.titular_provincia);
 
     if (!sets.length) return { ok: true };
     await this.db.query(

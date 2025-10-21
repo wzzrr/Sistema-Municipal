@@ -7,7 +7,7 @@ export class TitularesService {
 
   async byDominio(dominio: string) {
     const r = await this.db.query(
-      'SELECT dominio, nombre, dni, domicilio FROM titulares WHERE dominio=$1',
+      'SELECT dominio, nombre, dni, domicilio, tipo_vehiculo, marca, modelo, cp, departamento, provincia FROM titulares WHERE dominio=$1',
       [dominio.toUpperCase()],
     );
     if (!r.rows[0]) throw new NotFoundException('Dominio no encontrado');

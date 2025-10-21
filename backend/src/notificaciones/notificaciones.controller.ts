@@ -17,7 +17,7 @@ export class NotificacionesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Post(':infraccionId/pdf')
   @HttpCode(201)
-  @Roles('operador', 'admin')
+  @Roles('dev', 'admin', 'agente')
   generar(@Param('infraccionId') id: string) {
     return this.svc.generarPdf(Number(id));
   }
@@ -25,7 +25,7 @@ export class NotificacionesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Post(':infraccionId/pdf/stream')
   @HttpCode(200)
-  @Roles('operador', 'admin')
+  @Roles('dev', 'admin', 'agente')
   async generarStream(@Param('infraccionId') id: string, @Res() res: Response) {
     const { bytes, filename } = await this.svc.generarPdfStream(Number(id));
     res.setHeader('Content-Type', 'application/pdf');
@@ -35,7 +35,7 @@ export class NotificacionesController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Post(':id/enviar')
-  @Roles('operador', 'admin')
+  @Roles('dev', 'admin', 'agente')
   enviar(@Param('id') id: string, @Body() body: { email: string }) {
     return this.svc.enviar(Number(id), body.email);
   }

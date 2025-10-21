@@ -42,30 +42,37 @@ let InfraccionesService = class InfraccionesService {
         return { ocr, anpr, archivos };
     }
     async create(dto) {
+        this.log.debug('=== CREATE INFRACCION - DTO RECEIVED ===');
+        this.log.debug(JSON.stringify(dto, null, 2));
         const client = await this.db.connect();
         try {
             await client.query('BEGIN');
             const serie = 'A';
-            const up = await client.query('UPDATE correlativos SET ultimo=ultimo+1 WHERE serie=$1 RETURNING ultimo', [serie]);
-            const n = up.rows[0]?.ultimo ?? 1;
             const vMed = Number(dto.velocidad_medida) || 0;
             const vAut = dto.velocidad_autorizada !== undefined ? Number(dto.velocidad_autorizada) || 0 : 0;
             const ins = await client.query(`INSERT INTO infracciones(
-           serie, nro_correlativo, dominio, tipo_infraccion, fecha_labrado,
+           serie, dominio, tipo_infraccion, fecha_labrado, fecha_notificacion,
            velocidad_medida, velocidad_autorizada, ubicacion_texto, lat, lng,
            foto_file_id, cam_serie, tipo_vehiculo, vehiculo_marca, vehiculo_modelo,
-           emision_texto, arteria, estado
+           emision_texto, arteria, estado,
+           conductor_nombre, conductor_dni, conductor_domicilio, conductor_licencia,
+           conductor_licencia_clase, conductor_cp, conductor_departamento, conductor_provincia,
+           titular_nombre, titular_dni_cuit, titular_domicilio,
+           titular_cp, titular_departamento, titular_provincia
          )
          VALUES(
-           $1,$2,$3,'Exceso de velocidad',$4,
-           $5,$6,$7,$8,$9,
-           $10,$11,$12,$13,$14,
-           $15,$16,'validada'
+           $1, $2, 'Exceso de velocidad', $3, $4,
+           $5, $6, $7, $8, $9,
+           $10, $11, $12, $13, $14,
+           $15, $16, 'validada',
+           $17, $18, $19, $20,
+           $21, $22, $23, $24,
+           $25, $26, $27,
+           $28, $29, $30
          )
-         RETURNING id, serie, nro_correlativo,
-           to_char(now() at time zone 'utc','YYYY-MM-DD"T"HH24:MI:SS"Z"') AS fecha_carga`, [
-                serie, n,
-                dto.dominio, dto.fecha_labrado,
+         RETURNING id`, [
+                serie,
+                dto.dominio, dto.fecha_labrado, dto.fecha_notificacion || null,
                 vMed, vAut,
                 dto.ubicacion_texto || null,
                 dto.lat ?? null, dto.lng ?? null,
@@ -76,31 +83,39 @@ let InfraccionesService = class InfraccionesService {
                 dto.vehiculo_modelo || null,
                 dto.emision_texto ?? null,
                 dto.arteria ?? null,
+                dto.conductor_nombre || null,
+                dto.conductor_dni || null,
+                dto.conductor_domicilio || null,
+                dto.conductor_licencia || null,
+                dto.conductor_licencia_clase || null,
+                dto.conductor_cp || null,
+                dto.conductor_departamento || null,
+                dto.conductor_provincia || null,
+                dto.titular_nombre || null,
+                dto.titular_dni_cuit || null,
+                dto.titular_domicilio || null,
+                dto.titular_cp || null,
+                dto.titular_departamento || null,
+                dto.titular_provincia || null,
             ]);
             const row = ins.rows[0];
             await client.query('COMMIT');
+            const res = await this.db.query(`SELECT id, nro_acta, fecha_labrado, fecha_carga, dominio, velocidad_medida, velocidad_autorizada, estado
+           FROM v_infracciones
+          WHERE id=$1`, [row.id]);
+            const acta = res.rows[0];
             try {
                 if (this.notifs?.generarPdf) {
-                    await this.notifs.generarPdf(row.id);
+                    await this.notifs.generarPdf(acta.id);
                 }
                 else {
                     this.log.warn('NotificacionesService no disponible; se omite autogeneración de PDF.');
                 }
             }
             catch (e) {
-                this.log.warn(`Acta ${row.id} guardada pero falló la autogeneración de PDF: ${e?.message || e}`);
+                this.log.warn(`Acta ${acta.id} guardada pero falló la autogeneración de PDF: ${e?.message || e}`);
             }
-            const nro_acta = `${row.serie}-${String(row.nro_correlativo).padStart(7, '0')}`;
-            return {
-                id: row.id,
-                nro_acta,
-                fecha_carga: row.fecha_carga,
-                ...dto,
-                velocidad_medida: vMed,
-                velocidad_autorizada: vAut,
-                tipo_infraccion: 'Exceso de velocidad',
-                estado: 'validada',
-            };
+            return acta;
         }
         catch (e) {
             await client.query('ROLLBACK');
@@ -121,40 +136,17 @@ let InfraccionesService = class InfraccionesService {
         if (q.estado)
             push('i.estado=$X', q.estado);
         const sqlWhere = where.length ? 'WHERE ' + where.join(' AND ') : '';
-        try {
-            const rows = await this.db.query(`SELECT id, nro_acta, dominio, fecha_labrado, fecha_carga,
-                velocidad_medida, velocidad_autorizada, estado
-           FROM infracciones_view ${sqlWhere}
-          ORDER BY fecha_labrado DESC
-          LIMIT 200`, params);
-            return { page: 1, pageSize: rows.rows.length, total: rows.rows.length, items: rows.rows };
-        }
-        catch {
-            const whereSql = where.length ? 'WHERE ' + where.map((cl) => cl.replace(/^i\./, 'i.')).join(' AND ') : '';
-            const rows = await this.db.query(`SELECT
-           i.id,
-           (i.serie || '-' || lpad(i.nro_correlativo::text, 7, '0')) AS nro_acta,
-           i.dominio, i.fecha_labrado,
-           to_char(now() at time zone 'utc','YYYY-MM-DD"T"HH24:MI:SS"Z"') AS fecha_carga,
-           i.velocidad_medida, i.velocidad_autorizada, i.estado
-         FROM infracciones i
-         ${whereSql}
-         ORDER BY i.fecha_labrado DESC
-         LIMIT 200`, params);
-            return { page: 1, pageSize: rows.rows.length, total: rows.rows.length, items: rows.rows };
-        }
+        const rows = await this.db.query(`SELECT id, nro_acta, dominio, fecha_labrado, fecha_carga,
+              velocidad_medida, velocidad_autorizada, estado
+         FROM v_infracciones i
+         ${sqlWhere}
+        ORDER BY fecha_labrado DESC
+        LIMIT 200`, params);
+        return { page: 1, pageSize: rows.rows.length, total: rows.rows.length, items: rows.rows };
     }
     async getOne(id) {
-        try {
-            const r = await this.db.query('SELECT * FROM infracciones_view WHERE id=$1', [id]);
-            return r.rows[0];
-        }
-        catch {
-            const r = await this.db.query(`SELECT i.*, (i.serie || '-' || lpad(i.nro_correlativo::text, 7, '0')) AS nro_acta
-           FROM infracciones i
-          WHERE i.id=$1`, [id]);
-            return r.rows[0];
-        }
+        const r = await this.db.query(`SELECT * FROM v_infracciones WHERE id=$1`, [id]);
+        return r.rows[0];
     }
     async patch(id, dto) {
         const sets = [];
@@ -168,6 +160,8 @@ let InfraccionesService = class InfraccionesService {
             push('velocidad_autorizada=$X', Number(dto.velocidad_autorizada) || 0);
         if (dto.estado !== undefined)
             push('estado=$X', dto.estado);
+        if (dto.fecha_notificacion !== undefined)
+            push('fecha_notificacion=$X', dto.fecha_notificacion);
         if (dto.cam_serie !== undefined)
             push('cam_serie=$X', dto.cam_serie);
         if (dto.tipo_vehiculo !== undefined)
@@ -180,6 +174,34 @@ let InfraccionesService = class InfraccionesService {
             push('arteria=$X', dto.arteria);
         if (dto.emision_texto !== undefined)
             push('emision_texto=$X', dto.emision_texto);
+        if (dto.conductor_nombre !== undefined)
+            push('conductor_nombre=$X', dto.conductor_nombre);
+        if (dto.conductor_dni !== undefined)
+            push('conductor_dni=$X', dto.conductor_dni);
+        if (dto.conductor_domicilio !== undefined)
+            push('conductor_domicilio=$X', dto.conductor_domicilio);
+        if (dto.conductor_licencia !== undefined)
+            push('conductor_licencia=$X', dto.conductor_licencia);
+        if (dto.conductor_licencia_clase !== undefined)
+            push('conductor_licencia_clase=$X', dto.conductor_licencia_clase);
+        if (dto.conductor_cp !== undefined)
+            push('conductor_cp=$X', dto.conductor_cp);
+        if (dto.conductor_departamento !== undefined)
+            push('conductor_departamento=$X', dto.conductor_departamento);
+        if (dto.conductor_provincia !== undefined)
+            push('conductor_provincia=$X', dto.conductor_provincia);
+        if (dto.titular_nombre !== undefined)
+            push('titular_nombre=$X', dto.titular_nombre);
+        if (dto.titular_dni_cuit !== undefined)
+            push('titular_dni_cuit=$X', dto.titular_dni_cuit);
+        if (dto.titular_domicilio !== undefined)
+            push('titular_domicilio=$X', dto.titular_domicilio);
+        if (dto.titular_cp !== undefined)
+            push('titular_cp=$X', dto.titular_cp);
+        if (dto.titular_departamento !== undefined)
+            push('titular_departamento=$X', dto.titular_departamento);
+        if (dto.titular_provincia !== undefined)
+            push('titular_provincia=$X', dto.titular_provincia);
         if (!sets.length)
             return { ok: true };
         await this.db.query(`UPDATE infracciones SET ${sets.join(', ')} WHERE id=$${params.length + 1}`, [...params, id]);

@@ -5,6 +5,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 # Instalar herramientas necesarias para build y debugging
+# Incluye fuentes TrueType para canvas/sharp (evita cuadrados □ en PNGs)
 RUN apk update && apk add --no-cache \
     bash \
     coreutils \
@@ -13,7 +14,9 @@ RUN apk update && apk add --no-cache \
     git \
     curl \
     nano \
-    procps
+    procps \
+    ttf-dejavu \
+    fontconfig
 
 COPY package*.json ./
 RUN npm ci
@@ -31,6 +34,7 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 
 # Instalar herramientas básicas también en runtime (para Codex)
+# Incluye fuentes TrueType para canvas/sharp (evita cuadrados □ en PNGs)
 RUN apk update && apk add --no-cache \
     bash \
     coreutils \
@@ -39,7 +43,9 @@ RUN apk update && apk add --no-cache \
     git \
     curl \
     nano \
-    procps
+    procps \
+    ttf-dejavu \
+    fontconfig
 
 COPY package*.json ./
 RUN npm ci --omit=dev

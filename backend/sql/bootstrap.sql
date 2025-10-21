@@ -6,8 +6,14 @@ CREATE TABLE IF NOT EXISTS usuarios (
   activo BOOLEAN NOT NULL DEFAULT TRUE,
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Hash generado con: sha256('sv' + 'password') = 675b64aadde955b729917315a121ac327fffd489e50cf516c525281cb910c875
 INSERT INTO usuarios(email,password_hash,rol,activo)
-VALUES('admin@seguridadvial','{ed79d14fb2c45b4130e216eda8992fa0ddc0d7ed81dce28ec66bbe7a3ca7af4a}', 'admin', true)
+VALUES('admin@seguridadvial','675b64aadde955b729917315a121ac327fffd489e50cf516c525281cb910c875', 'admin', true)
+ON CONFLICT (email) DO NOTHING;
+
+-- Usuario dev (password: 'password')
+INSERT INTO usuarios(email,password_hash,rol,activo)
+VALUES('dev@seguridadvial','675b64aadde955b729917315a121ac327fffd489e50cf516c525281cb910c875', 'dev', true)
 ON CONFLICT (email) DO NOTHING;
 
 -- Optional helper to manage correlatives

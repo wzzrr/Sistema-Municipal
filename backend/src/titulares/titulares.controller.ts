@@ -10,7 +10,7 @@ export class TitularesController {
   constructor(private readonly svc: TitularesService) {}
 
   @Get(':dominio')
-  @Roles('operador', 'admin', 'auditor')
+  @Roles('dev', 'admin', 'agente')
   async byDominio(@Param('dominio') dominio: string) {
     return this.svc.byDominio(dominio);
   }

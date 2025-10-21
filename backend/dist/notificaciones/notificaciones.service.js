@@ -47,13 +47,12 @@ let NotificacionesService = class NotificacionesService {
          i.id,
          (i.serie || '-' || lpad(i.nro_correlativo::text, 7, '0')) AS nro_acta,
          i.serie, i.nro_correlativo,
-         i.dominio, i.fecha_labrado,
+         i.dominio, i.fecha_labrado, i.fecha_notificacion,
          i.ubicacion_texto, i.lat, i.lng,
          i.foto_file_id, i.cam_serie,
          i.tipo_vehiculo, i.vehiculo_marca, i.vehiculo_modelo,
-         t.nombre AS titular_nombre, t.dni AS titular_dni, t.domicilio AS titular_domicilio
+         i.titular_nombre, i.titular_dni_cuit AS titular_dni, i.titular_domicilio
        FROM infracciones i
-       LEFT JOIN titulares t ON t.dominio = i.dominio
        WHERE i.id = $1`, [infraccionId]);
         return r.rows[0];
     }
@@ -118,18 +117,45 @@ let NotificacionesService = class NotificacionesService {
         const color = rgb(0, 0, 0);
         const mm = (n) => n * 2.83464567;
         const yTop = (mmFromTop) => height - mm(mmFromTop);
+        const sanitize = (text) => {
+            if (!text)
+                return '';
+            try {
+                let result = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const charMap = {
+                    'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+                    'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
+                    'ñ': 'n', 'Ñ': 'N', 'ü': 'u', 'Ü': 'U',
+                };
+                for (const [special, normal] of Object.entries(charMap)) {
+                    result = result.split(special).join(normal);
+                }
+                result = result.replace(/[^\x20-\x7E]/g, '');
+                return result;
+            }
+            catch (e) {
+                return (text || '').replace(/[^\x20-\x7E]/g, '');
+            }
+        };
         const draw = (text, xmm, ymmFromTop, size = 9, bold = false) => {
-            page.drawText(text ?? '', {
-                x: mm(xmm),
-                y: yTop(ymmFromTop),
-                size,
-                font: bold ? fontBold : font,
-                color,
-            });
+            try {
+                const sanitized = sanitize(text ?? '');
+                page.drawText(sanitized, {
+                    x: mm(xmm),
+                    y: yTop(ymmFromTop),
+                    size,
+                    font: bold ? fontBold : font,
+                    color,
+                });
+            }
+            catch (e) {
+                log.warn(`Failed to draw text "${text}": ${e?.message || e}`);
+            }
         };
         const acta = this.actaNro(row);
         const fechaLabrado = row.fecha_labrado ? dayjs(row.fecha_labrado).format('DD/MM/YYYY') : '';
         const horaLabrado = row.fecha_labrado ? dayjs(row.fecha_labrado).format('HH:mm') : '';
+        const fechaNotificacion = row.fecha_notificacion ? dayjs(row.fecha_notificacion).format('DD/MM/YYYY') : '';
         const dominio = row.dominio ?? '';
         const ubicacion = row.ubicacion_texto ?? '';
         const tipoVeh = (row.tipo_vehiculo ?? '').toString();
@@ -167,6 +193,8 @@ let NotificacionesService = class NotificacionesService {
         const P_TITDNI_Y = numEnv('NOTIF_TIT_DNI_Y_MM', 123);
         const P_TITDOM_X = numEnv('NOTIF_TIT_DOM_X_MM', 40);
         const P_TITDOM_Y = numEnv('NOTIF_TIT_DOM_Y_MM', 128);
+        const P_FECHANOTIF_X = numEnv('NOTIF_FECHA_NOTIF_X_MM', 150);
+        const P_FECHANOTIF_Y = numEnv('NOTIF_FECHA_NOTIF_Y_MM', 260);
         draw(`${acta}`, P_ACTA_X, P_ACTA_Y, 10, true);
         draw(`${fechaLabrado}`, P_FECHA_X, P_FECHA_Y);
         draw(`${horaLabrado}`, P_HORA_X, P_HORA_Y);
@@ -182,6 +210,9 @@ let NotificacionesService = class NotificacionesService {
         draw(`${titularNombre}`, P_TITNOM_X, P_TITNOM_Y);
         draw(`DNI: ${titularDni}`, P_TITDNI_X, P_TITDNI_Y);
         draw(`${titularDom}`, P_TITDOM_X, P_TITDOM_Y);
+        if (fechaNotificacion) {
+            draw(`Notificado: ${fechaNotificacion}`, P_FECHANOTIF_X, P_FECHANOTIF_Y, 8);
+        }
         const PHOTO_X_MM = numEnv('NOTIF_PHOTO_X_MM', 102);
         const PHOTO_Y_MM = numEnv('NOTIF_PHOTO_Y_MM', 70);
         const PHOTO_W_MM = numEnv('NOTIF_PHOTO_W_MM', 100);
